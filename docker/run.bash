@@ -91,17 +91,14 @@ fi
 # Developer note: If you are running docker in cloudsim then make sure to add
 # -e IGN_PARTITION=subt to the following command.
 docker run -it \
-  -e DISPLAY \
-  -e QT_X11_NO_MITSHM=1 \
-  -e XAUTHORITY=$XAUTH \
-  -v "$XAUTH:$XAUTH" \
-  -v "/tmp/.X11-unix:/tmp/.X11-unix" \
-  -v "/etc/localtime:/etc/localtime:ro" \
-  -v "/dev/input:/dev/input" \
-  --network host \
-  --rm \
+  --env="DISPLAY=$DISPLAY" \
+  --env="QT_X11_NO_MITSHM=1" \
+  --volume="/tmp/.X11-unix:/tmp/.X11-unix:rw" \
+  --volume="/dev:/dev" \
+  --volume="/etc/localtime:/etc/localtime:ro" \
+  --net=host \
   --privileged \
+  --gpus all \
   --security-opt seccomp=unconfined \
-  $DOCKER_OPTS \
-  $IMG \
-  ${@:2}
+  --name mbzirc_sim_cont \
+  mbzirc_sim:latest
