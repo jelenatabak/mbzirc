@@ -3,14 +3,16 @@ FROM osrf/mbzirc:mbzirc_models_latest
 
 USER root
 
+ARG APT_KEY_DONT_WARN_ON_DANGEROUS_USAGE=1
+ENV DEBIAN_FRONTEND noninteractive
+ENV DEBCONF_NOWARNINGS="yes"
+
 RUN apt-get update && apt-get install -y --no-install-recommends \
     curl  && \
     curl -fsSL https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2004/x86_64/3bf863cc.pub | apt-key add - && \
     echo "deb https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2004/x86_64 /" > /etc/apt/sources.list.d/cuda.list && \
     apt-get purge --autoremove -y curl \
     && rm -rf /var/lib/apt/lists/*
-
-ENV CUDA_VERSION 11.2.0
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
     cuda-cudart-11-2=11.2.72-1 \
@@ -23,9 +25,6 @@ ENV PATH /usr/local/nvidia/bin:/usr/local/cuda/bin:${PATH}
 # nvidia-container-runtime
 ENV NVIDIA_VISIBLE_DEVICES all
 ENV NVIDIA_DRIVER_CAPABILITIES all
-
-# Let us install tzdata painlessly
-ENV DEBIAN_FRONTEND=noninteractive
 
 # Needed for string substitution
 SHELL ["/bin/bash", "-c"]
@@ -65,16 +64,14 @@ RUN apt-get update && apt-get install -y \
     python3 \
     python3-pip
 
-RUN python3 -m pip --no-cache-dir install --upgrade \
-    "pip<20.3" \
-    setuptools
-
 # Some TF tools expect a "python" binary
 RUN ln -s $(which python3) /usr/local/bin/python
 
-RUN python3 -m pip install --no-cache-dir tensorflow-gpu opencv-python
-
-ARG DEBIAN_FRONTEND=noninteractive
+RUN python3 -m pip install --no-cache-dir \
+  setuptools==58.2.0 \
+  tensorflow-gpu \
+  opencv-python \
+  gdown
 
 # Tools useful during development
 RUN apt-get update -qq \
@@ -155,6 +152,10 @@ RUN mkdir -p mbzirc_ws/src
 RUN cd /home/$USERNAME/mbzirc_ws/src \
  && git clone https://github.com/osrf/ros_ign.git -b galactic \
  && git clone https://github.com/jelenatabak/ros2_semantic_segmentation
+
+RUN mkdir /home/$USERNAME/mbzirc_ws/src/ros2_semantic_segmentation/models
+WORKDIR /home/$USERNAME/mbzirc_ws/src/ros2_semantic_segmentation/models
+RUN gdown --folder https://drive.google.com/drive/folders/1GSXym--DwzVlfCIATn2lXAZCEzzYMgIp
 
 WORKDIR /home/$USERNAME/mbzirc_ws
 
