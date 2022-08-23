@@ -1,57 +1,78 @@
 # Ubuntu 20.04 with nvidia-docker2 beta opengl support
-FROM tensorflow/tensorflow:latest-gpu	
-#FROM nvidia/opengl:1.0-glvnd-devel-ubuntu20.04
-
-ARG DEBIAN_FRONTEND=noninteractive
-
-RUN apt-get update \
- && apt-get install --no-install-recommends -y \
-    tzdata \
-    sudo \
-    wget \
-    gnupg2 \
-    lsb-release \
-    ca-certificates \
- && rm -rf /var/lib/apt/lists/* \
- && apt-get -qq clean
-
-# setup timezone
-RUN echo 'Etc/UTC' > /etc/timezone && \
-  ln -fs /usr/share/zoneinfo/Etc/UTC /etc/localtime \
-  && apt-get -qq update && apt-get -q -y install tzdata \
-  && rm -rf /var/lib/apt/lists/* \
-  && apt-get -qq clean
-
-# Set up repo to install Ignition
-RUN /bin/sh -c 'wget https://packages.osrfoundation.org/gazebo.gpg -O /usr/share/keyrings/pkgs-osrf-archive-keyring.gpg' \
-  && /bin/sh -c 'echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/pkgs-osrf-archive-keyring.gpg] http://packages.osrfoundation.org/gazebo/ubuntu-stable $(lsb_release -cs) main" | tee /etc/apt/sources.list.d/gazebo-stable.list > /dev/null'
-
-# Add a user with the same user_id as the user outside the container
-# Requires a docker build argument `user_id`
-ARG user_id
-ENV USERNAME developer
-RUN useradd -U --uid ${user_id} -ms /bin/bash $USERNAME \
- && echo "$USERNAME:$USERNAME" | chpasswd \
- && adduser $USERNAME sudo \
- && echo "$USERNAME ALL=NOPASSWD: ALL" >> /etc/sudoers.d/$USERNAME
-
-# Commands below run as the developer user
-USER $USERNAME
-
-# When running a container start in the developer's home folder
-WORKDIR /home/$USERNAME
-
-# install fuel-tools, download the public models, and uninstall fuel-tools again to keep the image smaller
-RUN sudo apt-get update \
- && sudo apt-get install -y \
-    libignition-fuel-tools7-dev \
- && ign fuel download -v 4 -j 8 --type model -u "https://fuel.ignitionrobotics.org/OpenRobotics/collections/mbzirc" \
- && sudo apt-get remove libignition-fuel-tools7-dev -y \
- && sudo apt-get autoremove -y \
- && sudo apt-get clean
-
+FROM osrf/mbzirc:mbzirc_models_latest
 
 USER root
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    curl  && \
+    curl -fsSL https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2004/x86_64/3bf863cc.pub | apt-key add - && \
+    echo "deb https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2004/x86_64 /" > /etc/apt/sources.list.d/cuda.list && \
+    apt-get purge --autoremove -y curl \
+    && rm -rf /var/lib/apt/lists/*
+
+ENV CUDA_VERSION 11.2.0
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    cuda-cudart-11-2=11.2.72-1 \
+    cuda-compat-11-2 \
+    && ln -s cuda-11.2 /usr/local/cuda && \
+    rm -rf /var/lib/apt/lists/*
+
+ENV PATH /usr/local/nvidia/bin:/usr/local/cuda/bin:${PATH}
+
+# nvidia-container-runtime
+ENV NVIDIA_VISIBLE_DEVICES all
+ENV NVIDIA_DRIVER_CAPABILITIES all
+
+# Let us install tzdata painlessly
+ENV DEBIAN_FRONTEND=noninteractive
+
+# Needed for string substitution
+SHELL ["/bin/bash", "-c"]
+# Pick up some TF dependencies
+RUN apt-key adv --fetch-keys https://developer.download.nvidia.com/compute/cuda/repos/ubuntu1804/x86_64/3bf863cc.pub && \
+    apt-get update && apt-get install -y --no-install-recommends \
+        build-essential \
+        cuda-command-line-tools-11-2 \
+        libcublas-11-2 \
+        cuda-nvrtc-11-2 \
+        libcufft-11-2 \
+        libcurand-11-2 \
+        libcusolver-11-2 \
+        libcusparse-11-2 \
+        curl \
+        libcudnn8=8.1.0.77-1+cuda11.2 \
+        libfreetype6-dev \
+        libhdf5-serial-dev \
+        libzmq3-dev \
+        pkg-config \
+        software-properties-common \
+        unzip
+
+# For CUDA profiling, TensorFlow requires CUPTI.
+ENV LD_LIBRARY_PATH /usr/local/cuda-11.0/targets/x86_64-linux/lib:/usr/local/cuda/extras/CUPTI/lib64:/usr/local/cuda/lib64:$LD_LIBRARY_PATH
+
+# Link the libcuda stub to the location where tensorflow is searching for it and reconfigure
+# dynamic linker run-time bindings
+RUN ln -s /usr/local/cuda/lib64/stubs/libcuda.so /usr/local/cuda/lib64/stubs/libcuda.so.1 \
+    && echo "/usr/local/cuda/lib64/stubs" > /etc/ld.so.conf.d/z-cuda-stubs.conf \
+    && ldconfig
+
+# See http://bugs.python.org/issue19846
+ENV LANG C.UTF-8
+
+RUN apt-get update && apt-get install -y \
+    python3 \
+    python3-pip
+
+RUN python3 -m pip --no-cache-dir install --upgrade \
+    "pip<20.3" \
+    setuptools
+
+# Some TF tools expect a "python" binary
+RUN ln -s $(which python3) /usr/local/bin/python
+
+RUN python3 -m pip install --no-cache-dir tensorflow-gpu opencv-python
 
 ARG DEBIAN_FRONTEND=noninteractive
 
@@ -132,7 +153,8 @@ RUN mkdir -p mbzirc_ws/src
 
 # clone ros_ign bridge
 RUN cd /home/$USERNAME/mbzirc_ws/src \
- && git clone https://github.com/osrf/ros_ign.git -b galactic
+ && git clone https://github.com/osrf/ros_ign.git -b galactic \
+ && git clone https://github.com/jelenatabak/ros2_semantic_segmentation
 
 WORKDIR /home/$USERNAME/mbzirc_ws
 
