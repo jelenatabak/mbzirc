@@ -90,17 +90,30 @@ fi
 
 # Developer note: If you are running docker in cloudsim then make sure to add
 # -e IGN_PARTITION=subt to the following command.
-docker run -it \
-  -e DISPLAY \
-  -e QT_X11_NO_MITSHM=1 \
-  -e XAUTHORITY=$XAUTH \
-  -v "$XAUTH:$XAUTH" \
-  -v "/tmp/.X11-unix:/tmp/.X11-unix" \
-  -v "/etc/localtime:/etc/localtime:ro" \
-  -v "/dev/input:/dev/input" \
-  --network host \
+# docker run -it \
+#   -e DISPLAY \
+#   -e QT_X11_NO_MITSHM=1 \
+#   -e XAUTHORITY=$XAUTH \
+#   -v "$XAUTH:$XAUTH" \
+#   -v "/tmp/.X11-unix:/tmp/.X11-unix" \
+#   -v "/etc/localtime:/etc/localtime:ro" \
+#   -v "/dev/input:/dev/input" \
+#   --network host \
+#   --privileged \
+#   --security-opt seccomp=unconfined \
+#   --gpus all \
+#   --name mbzirc_tf \
+#   mbzirc_sim:latest
+
+  docker run -it \
+  --env="DISPLAY=$DISPLAY" \
+  --env="QT_X11_NO_MITSHM=1" \
+  --volume="/tmp/.X11-unix:/tmp/.X11-unix:rw" \
+  --volume="/dev:/dev" \
+  --volume="/etc/localtime:/etc/localtime:ro" \
+  --net=host \
   --privileged \
-  --security-opt seccomp=unconfined \
   --gpus all \
-  --name mbzirc_sim_cont \
+  --security-opt seccomp=unconfined \
+  --name mbzirc_tf \
   mbzirc_sim:latest

@@ -71,6 +71,7 @@ RUN python3 -m pip install --no-cache-dir \
   setuptools==58.2.0 \
   tensorflow-gpu \
   opencv-python \
+  scipy \
   gdown
 
 # Tools useful during development
@@ -136,6 +137,8 @@ RUN apt-get -qq update && apt-get -q -y install \
   && rm -rf /var/lib/apt/lists/* \
   && apt-get -qq clean
 
+RUN apt-get install ros-galactic-message-filters
+
 # Commands below run as the developer user
 USER $USERNAME
 
@@ -148,14 +151,15 @@ WORKDIR /home/$USERNAME
 # Prepare the colcon workspace
 RUN mkdir -p mbzirc_ws/src
 
-# clone ros_ign bridge
+# clone repositories
 RUN cd /home/$USERNAME/mbzirc_ws/src \
  && git clone https://github.com/osrf/ros_ign.git -b galactic \
- && git clone https://github.com/jelenatabak/ros2_semantic_segmentation
+ && git clone https://github.com/FerMbzirc2023/ros2_semantic_segmentation \
+ && git clone https://github.com/Box-Robotics/ros2_numpy
 
 RUN mkdir /home/$USERNAME/mbzirc_ws/src/ros2_semantic_segmentation/models
 WORKDIR /home/$USERNAME/mbzirc_ws/src/ros2_semantic_segmentation/models
-RUN gdown --folder https://drive.google.com/drive/folders/1GSXym--DwzVlfCIATn2lXAZCEzzYMgIp
+RUN gdown --folder https://drive.google.com/drive/folders/1wHnTH0jw3RY33DJ4w4iSuzTndmwP2JAC?usp=sharing
 
 WORKDIR /home/$USERNAME/mbzirc_ws
 
